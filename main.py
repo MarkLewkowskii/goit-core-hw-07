@@ -28,9 +28,9 @@ class Phone(Field):
 class Birthday(Field):
     def __init__(self, value):
         try:
-            self.value = datetime.strptime(value, "%Y.%m.%d").date()
+            self.value = datetime.strptime(value, "%d.%m.%Y").date()
         except ValueError:
-            raise ValueError("Неправильний формат дати. Введіть дату в форматі YYYY.MM.DD")
+            raise ValueError("Неправильний формат дати. Введіть дату в форматі DD.MM.YYYY")
 
 class Record:
     def __init__(self, name):
@@ -69,7 +69,11 @@ class Record:
         self.birthday = Birthday(value)
 
     def __str__(self):
-        return f"Ім'я контакту: {self.name.value}, Номери: {'; '.join(p.value for p in self.phones)}, День народження: {self.birthday}"
+        birthday_str = self.birthday.value.strftime("%d.%m.%Y") if self.birthday else "не вказаний"
+        return f"Ім'я контакту: {self.name.value}, Номери: {'; '.join(p.value for p in self.phones)}, День народження: {birthday_str}"
+
+    def __repr__(self):
+        return self.__str__()
 
 class AddressBook(UserDict):
     def add_record(self, record):
@@ -88,21 +92,22 @@ class AddressBook(UserDict):
         upcoming_birthdays = []
         
         for record in self.data.values():
-            birthday = record.birthday.value
-            current_year_birthday = birthday.replace(year=today.year)
-            days_until_birthday = (current_year_birthday - today).days
+            if record.birthday:  
+                birthday = record.birthday.value
+                current_year_birthday = birthday.replace(year=today.year)
+                days_until_birthday = (current_year_birthday - today).days
 
-            if 0 <= days_until_birthday <= 7:
-                days_ahead = 7 - current_year_birthday.weekday() if current_year_birthday.weekday() >= 5 else 0
-                congrats_date = current_year_birthday + timedelta(days = days_ahead)
-                upcoming_birthdays.append(f"Ім'я: {record.name.value} День народження: {birthday} Дата привітання: {congrats_date.strftime('%Y.%m.%d')}")
-        
-        return upcoming_birthdays
-            
+                if 0 <= days_until_birthday <= 7:
+                    days_ahead = 7 - current_year_birthday.weekday() if current_year_birthday.weekday() >= 5 else 0
+                    congrats_date = current_year_birthday + timedelta(days=days_ahead)
+                    upcoming_birthdays.append(f"Ім'я: {record.name.value} День народження: {birthday} Дата привітання: {congrats_date.strftime('%Y.%m.%d')}")
+        if upcoming_birthdays:
+            return upcoming_birthdays
+        else:
+            return "Не має днів народжень в наступні 7 днів."
 
     def __str__(self):
         return '\n'.join(str(record) for record in self.data.values())
-
 
 def input_error(func):
     def inner(*args, **kwargs):
@@ -114,9 +119,9 @@ def input_error(func):
             return "Контакт не знайдено."
         except IndexError:
             return "Введіть всю необхідну інформацію."
-
+        except AttributeError as e:
+            return str(e)
     return inner
-
 
 def parse_input(user_input):
     cmd, *args = user_input.split()
@@ -177,7 +182,6 @@ def add_birthday(args, contacts):
     else:
         raise KeyError
 
-
 @input_error
 def show_birthday(args, contacts):
     if len(args) < 1:
@@ -185,16 +189,17 @@ def show_birthday(args, contacts):
     name = args[0]
     record = contacts.find(name)
     if record:
-        return f"Ім'я: {record.name.value} День народження: {record.birthday.value}"
+        if record.birthday:
+            return f"Ім'я: {record.name.value} День народження: {record.birthday.value.strftime('%d.%m.%Y')}"
+        else:
+            return f"Ім'я: {record.name.value} День народження: не вказаний"
     else:
-        raise KeyError  
-    
+        raise KeyError
 
 @input_error
 def birthdays(contacts):
     return contacts.get_upcoming_birthdays()
-    
-    
+
 def main():
     contacts = AddressBook()
     print("Welcome to the assistant bot!")
